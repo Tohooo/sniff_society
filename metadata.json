@@ -1,0 +1,8 @@
+{
+  "name": "Sniff Society — Niche Perfume Decant & Community Voting",
+  "description": "Luxury niche perfume decant boutique and community voting arena. Vote weekly for your favorite fragrances, discover olfactory pyramids, and shop authenticated repacks on Shopee.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
