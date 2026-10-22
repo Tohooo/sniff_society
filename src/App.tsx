@@ -1,4 +1,3 @@
-import { searchFragrances } from './services/fragellaApi';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -15,15 +14,44 @@ import { HowItWorksModal } from './components/HowItWorksModal';
 import { Footer } from './components/Footer';
 import { AdminSuggestionModal } from './components/AdminSuggestionModal';
 import { UploadFragranceModal } from './components/UploadFragranceModal';
-import { INITIAL_FRAGRANCES, INITIAL_REVIEWS, INITIAL_SUGGESTIONS } from './data/fragranceData';
+import { UserManagementModal } from './components/UserManagementModal';
+import { INITIAL_REVIEWS } from './data/fragranceData';
 import { Fragrance, Review, Suggestion, UserProfile, DecantSize } from './types';
 import { getTopWinners, toggleFragranceVote, canUserVote } from './utils/votingEngine';
+import {
+  fetchFragrancesFromDB,
+  insertFragranceToDB,
+  updateFragranceVotesDB,
+  fetchSuggestionsFromDB,
+  insertSuggestionToDB,
+  upsertUserToDB,
+  fetchUsersFromDB
+} from './services/dbService';
 
 export default function App() {
   // State Navigasi Halaman ('dashboard' | 'winners' | 'katalog' | 'kritik' | 'carakerja')
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'winners' | 'katalog' | 'kritik' | 'carakerja'>('dashboard');
 
   const [isAdminSuggestionOpen, setIsAdminSuggestionOpen] = useState(false);
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+
+  // Daftar akun terdaftar untuk manajemen Super Admin
+  const [registeredUsers, setRegisteredUsers] = useState<UserProfile[]>([
+    {
+      role: 'superadmin',
+      name: 'Admin Sniff Society',
+      email: 'admin@sniffsociety.id',
+      phone: '08211413989',
+      votedIds: [],
+      maxVotes: 1,
+      waSubscribed: true,
+    }
+  ]);
+
+  const handleDeleteUser = (email: string) => {
+    setRegisteredUsers((prev) => prev.filter((u) => u.email !== email));
+    showToast(`Akun dengan email ${email} berhasil dihapus.`);
+  };
 
   const handleDeleteSuggestion = (id: string) => {
     setSuggestions((prev) => prev.filter((s) => s.id !== id));
@@ -45,38 +73,74 @@ export default function App() {
   };
 
   const [editingFragrance, setEditingFragrance] = useState<Fragrance | null>(null);
-
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const [fragrances, setFragrances] = useState<Fragrance[]>(() => {
-    const saved = localStorage.getItem('sniff_society_fragrances');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Gagal memparsing data dari localStorage', e);
-      }
-    }
-    return INITIAL_FRAGRANCES;
-  });
+  // MENGAMBIL DATA DARI POSTGRESQL SUPABASE
+  const [fragrances, setFragrances] = useState<Fragrance[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [isLoadingDB, setIsLoadingDB] = useState(true);
 
   useEffect(() => {
-    localStorage.setItem('sniff_society_fragrances', JSON.stringify(fragrances));
-  }, [fragrances]);
+    async function loadDataFromSupabase() {
+      setIsLoadingDB(true);
+      try {
+        const dbFragrances = await fetchFragrancesFromDB();
+        const dbSuggestions = await fetchSuggestionsFromDB();
+        const dbUsers = await fetchUsersFromDB(); // <-- Ambil data user dari DB
+
+        setFragrances(dbFragrances);
+        setSuggestions(dbSuggestions);
+        if (dbUsers.length > 0) {
+          setRegisteredUsers(dbUsers); // <-- Masukkan ke state registeredUsers
+        }
+      } catch (err) {
+        console.error('Gagal memuat data dari Supabase:', err);
+        showToast('Gagal terhubung ke database.');
+      } finally {
+        setIsLoadingDB(false);
+      }
+    }
+    loadDataFromSupabase();
+  }, []);
 
   const [reviews, setReviews] = useState<Review[]>(INITIAL_REVIEWS);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>(INITIAL_SUGGESTIONS);
   const [cycleNumber, setCycleNumber] = useState<number>(48);
 
-  const [user, setUser] = useState<UserProfile>({
-    role: 'guest',
-    name: 'Tamu Penikmat Aroma',
-    email: 'guest@scentsociety.id',
-    phone: '081289201928',
-    votedIds: [],
-    maxVotes: 3,
-    waSubscribed: true,
+  // Membaca state user dari localStorage agar tidak ter-logout saat di-refresh
+  const [user, setUser] = useState<UserProfile>(() => {
+    const savedUser = localStorage.getItem('sniff_society_current_user');
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch (e) {
+        console.error('Gagal memparsing data user dari localStorage', e);
+      }
+    }
+    return {
+      role: 'guest',
+      name: 'Tamu Penikmat Aroma',
+      email: 'guest@scentsociety.id',
+      phone: '081289201928',
+      votedIds: [],
+      maxVotes: 1,
+      waSubscribed: true,
+    };
   });
+
+  // Menyimpan state user ke localStorage setiap kali berubah
+  useEffect(() => {
+    localStorage.setItem('sniff_society_current_user', JSON.stringify(user));
+  }, [user]);
+
+  const handleRegisterOrUpdateUser = (updatedUser: UserProfile) => {
+    setRegisteredUsers((prev) => {
+      const exists = prev.some((u) => u.email === updatedUser.email);
+      if (exists) {
+        return prev.map((u) => (u.email === updatedUser.email ? updatedUser : u));
+      }
+      return [...prev, updatedUser];
+    });
+  };
 
   // Modal Dialog States
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -106,9 +170,8 @@ export default function App() {
     return fragrances.reduce((acc, f) => acc + f.votes, 0);
   }, [fragrances]);
 
-  // Vote toggle handler dengan validasi login
-  const handleToggleVote = (fragranceId: string) => {
-    // Jika user belum login (masih guest), buka modal Auth & hentikan proses vote
+  // Vote toggle handler dengan sinkronisasi ke PostgreSQL
+  const handleToggleVote = async (fragranceId: string) => {
     if (user.role === 'guest') {
       setIsAuthOpen(true);
       showToast('Silakan masuk/login terlebih dahulu untuk memberikan suara.');
@@ -128,6 +191,18 @@ export default function App() {
         user.maxVotes
       );
 
+      const targetFragrance = fragrances.find((f) => f.id === fragranceId);
+      if (!targetFragrance) return;
+
+      const newVotesCount = action === 'added' ? targetFragrance.votes + 1 : Math.max(0, targetFragrance.votes - 1);
+
+      // Simpan perubahan suara ke database Supabase
+      const success = await updateFragranceVotesDB(fragranceId, newVotesCount);
+      if (!success) {
+        showToast('Gagal menyimpan vote ke database.');
+        return;
+      }
+
       setUser((prev) => ({ ...prev, votedIds: newVotedIds }));
 
       setFragrances((prev) =>
@@ -135,22 +210,17 @@ export default function App() {
           if (item.id === fragranceId) {
             return {
               ...item,
-              votes: action === 'added' ? item.votes + 1 : Math.max(0, item.votes - 1),
+              votes: newVotesCount,
             };
           }
           return item;
         })
       );
 
-      const fragranceItem = fragrances.find((f) => f.id === fragranceId);
       if (action === 'added') {
-        showToast(
-          `✓ Berhasil memilih "${fragranceItem?.name}". Sisa kuota: ${user.maxVotes - newVotedIds.length} vote.`
-        );
+        showToast(`✓ Berhasil memilih "${targetFragrance.name}".`);
       } else {
-        showToast(
-          `Suara untuk "${fragranceItem?.name}" dibatalkan. Kuota vote bertambah 1.`
-        );
+        showToast(`Suara untuk "${targetFragrance.name}" dibatalkan.`);
       }
     } catch (err: any) {
       showToast(err.message || 'Terjadi kesalahan saat memproses vote');
@@ -173,16 +243,21 @@ export default function App() {
     );
   };
 
-  const handleSubmitSuggestion = (newSug: Omit<Suggestion, 'id' | 'upvotes' | 'date'>) => {
-    const item: Suggestion = {
+  const handleSubmitSuggestion = async (newSug: Omit<Suggestion, 'id' | 'upvotes' | 'date'>) => {
+    const success = await insertSuggestionToDB({
       ...newSug,
-      id: `sug-${Date.now()}`,
       upvotes: 1,
       userUpvoted: true,
-      date: 'Hari ini',
-    };
-    setSuggestions((prev) => [item, ...prev]);
-    showToast('Aspirasi Anda berhasil dikirim!');
+      status: 'in_review',
+    });
+
+    if (success) {
+      const dbSuggestions = await fetchSuggestionsFromDB();
+      setSuggestions(dbSuggestions);
+      showToast('Aspirasi Anda berhasil dikirim ke database!');
+    } else {
+      showToast('Gagal mengirim aspirasi.');
+    }
   };
 
   const handleSubmitReview = (reviewData: Omit<Review, 'id' | 'date' | 'helpfulCount'>) => {
@@ -196,19 +271,24 @@ export default function App() {
     showToast('Review dan rating Anda berhasil ditambahkan!');
   };
 
-  const handleAddFragrance = (savedFrag: Fragrance) => {
-    setFragrances((prev) => {
-      const exists = prev.some((f) => f.id === savedFrag.id);
-      if (exists) {
-        return prev.map((f) => (f.id === savedFrag.id ? savedFrag : f));
-      }
-      return [savedFrag, ...prev];
-    });
-    showToast(`Parfum "${savedFrag.name}" berhasil diperbarui!`);
+  const handleAddFragrance = async (savedFrag: Fragrance) => {
+    const success = await insertFragranceToDB(savedFrag);
+    if (success) {
+      const dbFragrances = await fetchFragrancesFromDB();
+      setFragrances(dbFragrances);
+      showToast(`Parfum "${savedFrag.name}" berhasil disimpan ke database PostgreSQL!`);
+    } else {
+      showToast('Gagal menyimpan parfum ke database.');
+    }
   };
 
-  const handleResetCycleVotes = () => {
-    setFragrances((prev) => prev.map((f) => ({ ...f, votes: 0 })));
+  const handleResetCycleVotes = async () => {
+    // Reset vote ke 0 untuk semua parfum di DB
+    for (const f of fragrances) {
+      await updateFragranceVotesDB(f.id, 0);
+    }
+    const dbFragrances = await fetchFragrancesFromDB();
+    setFragrances(dbFragrances);
     setUser((prev) => ({ ...prev, votedIds: [] }));
     setCycleNumber((c) => c + 1);
     showToast(`Siklus #${cycleNumber + 1} dimulai!`);
@@ -230,12 +310,19 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#121316] text-[#F3F0EA] flex flex-col font-sans selection:bg-[#C5A880] selection:text-[#121316]">
 
+      {/* Loading Indicator Database */}
+      {isLoadingDB && (
+        <div className="bg-[#2A2318] text-center text-[#E5C390] text-xs py-1">
+          Menghubungkan ke Database PostgreSQL Supabase...
+        </div>
+      )}
+
       {/* Super Admin Top Banner Notice */}
       {user.role === 'superadmin' && (
         <div className="bg-[#2A2318] border-b border-[#C5A880]/40 text-[#E5C390] px-4 py-2 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#C5A880] animate-pulse" />
-            <span>Mode Super Admin Aktif · Kelola kurasi, unggah parfum, dan moderasi saran.</span>
+            <span>Mode Super Admin Aktif · Terhubung ke PostgreSQL Supabase.</span>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -251,6 +338,12 @@ export default function App() {
               Kelola Saran & Kritik
             </button>
             <button
+              onClick={() => setIsUserManagementOpen(true)}
+              className="bg-[#1A1C21] border border-[#C5A880] text-[#E5C390] font-semibold px-3 py-1 rounded-sm hover:bg-[#252830] transition-colors cursor-pointer"
+            >
+              Kelola User
+            </button>
+            <button
               onClick={() => setIsAdminOpen(true)}
               className="underline font-semibold hover:text-white cursor-pointer"
             >
@@ -260,7 +353,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Navbar Header (Selalu Muncul) - Kirim props navigasi halaman */}
+      {/* Navbar Header */}
       <Header
         user={user}
         currentPage={currentPage}
@@ -273,10 +366,8 @@ export default function App() {
         totalVotesCount={totalVotesAcrossAll}
       />
 
-      {/* Konten Halaman Berdasarkan Menu yang Dipilih */}
+      {/* Konten Halaman */}
       <main className="flex-1">
-
-        {/* 1. MENU DASHBOARD */}
         {currentPage === 'dashboard' && (
           <HeroSection
             onExploreVoting={() => setCurrentPage('katalog')}
@@ -285,7 +376,6 @@ export default function App() {
           />
         )}
 
-        {/* 2. MENU TOP 3 WINNERS */}
         {currentPage === 'winners' && (
           <TopWinnersSection
             winners={currentWinners}
@@ -296,7 +386,6 @@ export default function App() {
           />
         )}
 
-        {/* 3 & 4. MENU KATALOG PARFUM (Voting Arena & FragDB Catalog) */}
         {currentPage === 'katalog' && (
           <VotingArenaSection
             fragrances={filteredFragrances}
@@ -306,11 +395,9 @@ export default function App() {
             onOpenFragranceDetail={(fragrance) => setDetailFragrance(fragrance)}
             onOpenWriteReview={(fragrance) => setReviewFragrance(fragrance)}
             onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
-            onApiResultsLoaded={(newFragrances) => setFragrances(newFragrances)}
           />
         )}
 
-        {/* 5. MENU KRITIK & SARAN */}
         {currentPage === 'kritik' && (
           <KritikSaranSection
             suggestions={suggestions}
@@ -319,10 +406,9 @@ export default function App() {
             user={user}
           />
         )}
-
       </main>
 
-      {/* 6. FOOTER (Selalu Muncul di Setiap Halaman) */}
+      {/* Footer */}
       <Footer onNavigate={(page) => setCurrentPage(page)} />
 
       {/* Modals & Dialogs */}
@@ -354,6 +440,14 @@ export default function App() {
         currentUser={user}
       />
 
+      <UserManagementModal
+        isOpen={isUserManagementOpen}
+        onClose={() => setIsUserManagementOpen(false)}
+        registeredUsers={registeredUsers}
+        onDeleteUser={handleDeleteUser}
+        currentUser={user}
+      />
+
       <WhatsAppSimulationModal
         isOpen={isWAOpen}
         onClose={() => setIsWAOpen(false)}
@@ -372,9 +466,17 @@ export default function App() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         currentUser={user}
-        onUpdateUser={(updated) => {
+        onUpdateUser={async (updated) => {
           setUser(updated);
-          showToast(`Peran berhasil diubah menjadi: ${updated.role.toUpperCase()}`);
+          handleRegisterOrUpdateUser(updated);
+
+          // Simpan permanen ke tabel users di Supabase
+          const success = await upsertUserToDB(updated);
+          if (success) {
+            showToast(`Berhasil masuk & tersimpan: ${updated.name}`);
+          } else {
+            showToast(`Berhasil masuk, tetapi gagal sinkron ke DB.`);
+          }
         }}
       />
 
@@ -388,8 +490,8 @@ export default function App() {
         currentUser={user}
         onSelectFragranceForEdit={(frag) => {
           setEditingFragrance(frag);
-          setIsAdminOpen(false); // Tutup panel admin
-          setIsUploadModalOpen(true); // Buka modal form edit
+          setIsAdminOpen(false);
+          setIsUploadModalOpen(true);
         }}
       />
 

@@ -111,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A880]" />
               <span className="font-mono tabular-nums text-[#C5A880] text-[11px] sm:text-xs">
-                {3 - remainingVotes}/3
+                {user.votedIds.length}/{user.maxVotes}
               </span>
               <div className="h-3 w-[1px] bg-[#2E3138]" />
               <User className="w-3.5 h-3.5 text-[#A1A1AA]" />

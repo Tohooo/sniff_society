@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, ShieldCheck, Check, Edit3 } from 'lucide-react';
+import { X, Plus, ShieldCheck, Check, Edit3, Image as ImageIcon } from 'lucide-react';
 import { Fragrance, FragranceCategory, FragranceGender, UserProfile } from '../types';
 
 interface UploadFragranceModalProps {
@@ -69,6 +69,18 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
         }
     }, [editFragrance, isOpen]);
 
+    // Handler konversi file lokal ke Base64
+    const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImageUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     if (!isOpen) return null;
 
     const handleCreate = (e: React.FormEvent) => {
@@ -90,7 +102,7 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
             category,
             gender,
             concentration,
-            image: imageUrl.trim() || editFragrance?.image || '/src/assets/images/perfume_baccarat_crimson_1792550618912.jpg',
+            image: imageUrl.trim() || editFragrance?.image || 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?auto=format&fit=crop&q=80&w=800',
             notes: {
                 top: topNotes.split(',').map((s) => s.trim()).filter(Boolean),
                 mid: midNotes.split(',').map((s) => s.trim()).filter(Boolean),
@@ -133,7 +145,7 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
                                 {editFragrance ? `Edit Parfum: ${editFragrance.name}` : 'Upload Parfum Baru (Super Admin)'}
                             </h3>
                             <p className="text-xs text-[#8F9098]">
-                                {editFragrance ? 'Perbarui informasi detail dan tautan pembelian Shopee parfum' : 'Tambahkan koleksi parfum lokal atau global ke database Sniff Society'}
+                                {editFragrance ? 'Perbarui informasi detail dan foto parfum' : 'Tambahkan koleksi parfum lokal atau global dengan foto dari komputer'}
                             </p>
                         </div>
                     </div>
@@ -151,7 +163,7 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
                     {formSuccess && (
                         <div className="p-3 mb-4 bg-[#14291E] border border-[#25D366] text-[#25D366] text-xs rounded-sm flex items-center gap-2">
                             <Check className="w-4 h-4" />
-                            <span>{editFragrance ? 'Perubahan parfum berhasil disimpan!' : 'Parfum berhasil diupload dan ditambahkan ke arena voting!'}</span>
+                            <span>{editFragrance ? 'Perubahan parfum berhasil disimpan!' : 'Parfum berhasil diupload dan ditambahkan ke katalog!'}</span>
                         </div>
                     )}
 
@@ -223,15 +235,26 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="space-y-1">
-                            <label className="text-xs text-[#A1A1AA]">URL Gambar Botol (Opsional)</label>
-                            <input
-                                type="text"
-                                value={imageUrl}
-                                onChange={(e) => setImageUrl(e.target.value)}
-                                placeholder="https://... (kosongkan untuk menggunakan gambar default)"
-                                className="w-full py-2 px-3 bg-[#121316] border border-[#2E3138] text-xs text-[#F3F0EA] rounded-sm outline-none focus:border-[#C5A880]"
-                            />
+                        {/* Upload File Gambar dari Lokal */}
+                        <div className="space-y-1.5">
+                            <label className="text-xs text-[#A1A1AA] flex items-center gap-1.5">
+                                <ImageIcon className="w-3.5 h-3.5 text-[#C5A880]" />
+                                <span>Upload Foto Botol Parfum (Dari Komputer Lokal)</span>
+                            </label>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageFileChange}
+                                    className="w-full text-xs text-[#A1A1AA] file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:text-xs file:font-semibold file:bg-[#2A2318] file:text-[#E5C390] hover:file:bg-[#342b1e] file:cursor-pointer bg-[#121316] border border-[#2E3138] rounded-sm p-1"
+                                />
+                            </div>
+                            {imageUrl && (
+                                <div className="mt-2 flex items-center gap-3 p-2 bg-[#121316] border border-[#26282E] rounded-sm">
+                                    <img src={imageUrl} alt="Preview" className="w-12 h-12 object-cover rounded-sm border border-[#2E3138]" />
+                                    <span className="text-[11px] text-[#25D366]">✓ Foto lokal berhasil dimuat dan siap disimpan</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-3 pt-2">

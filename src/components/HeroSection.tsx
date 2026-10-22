@@ -88,7 +88,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-[#A1A1AA] font-normal leading-relaxed max-w-2xl text-pretty">
             Platform kurasi decant parfum otentik pertama di Indonesia yang ditenagai suara publik.
-            Gunakan 3 hak suara mingguan Anda untuk menentukan parfum niche dunia yang akan dibotolkan
+            Gunakan hak suara mingguan Anda untuk menentukan parfum niche dunia yang akan dibotolkan
             dalam ukuran 2ml, 3ml, 5ml, hingga 10ml dan siap di-checkout via Shopee.
           </p>
 
@@ -151,7 +151,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 Total {totalVotesCount.toLocaleString()} Suara Komunitas
               </h3>
               <p className="text-xs text-[#8F9098] leading-relaxed">
-                Voting diperbarui secara real-time. Anda bebas merealokasikan suara hingga H-1 sebelum penutupan siklus.
+                Voting diperbarui secara real-time. Tentukan 1 pilihan terbaik Anda sebelum penutupan siklus.
               </p>
             </div>
           </div>

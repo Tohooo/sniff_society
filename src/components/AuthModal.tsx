@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, Mail, Lock, CheckCircle2, ArrowRight, UserPlus, KeyRound, ArrowLeft, LogOut, Phone } from 'lucide-react';
 import { UserProfile } from '../types';
+import { upsertUserToDB } from '../services/dbService'; // <-- TAMBAHKAN INI DI ATAS
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile;
   onUpdateUser: (updated: UserProfile) => void;
+  onRegisterUser?: (user: UserProfile) => void;
 }
 
 interface RegisteredUser {
@@ -60,8 +62,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     localStorage.setItem('sniff_society_db_users', JSON.stringify(users));
   };
 
-  // 1. Handler Login dengan Validasi Ketat DB
-  const handleLogin = (e: React.FormEvent) => {
+  // 1. Handler Login dengan Sinkronisasi ke Supabase
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -72,51 +74,61 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-
-      // Cek apakah Super Admin
-      if (
-        email.toLowerCase() === SUPER_ADMIN.email.toLowerCase() &&
-        password === SUPER_ADMIN.password
-      ) {
-        onUpdateUser({
-          ...currentUser,
-          role: 'superadmin',
-          name: SUPER_ADMIN.name,
-          email: SUPER_ADMIN.email,
-          phone: SUPER_ADMIN.phone,
-        });
-        onClose();
-        resetForm();
-        return;
-      }
-
-      // Cek ke database localStorage user terdaftar
-      const users = getStoredUsers();
-      const foundUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-
-      if (!foundUser) {
-        setErrorMessage('Email belum terdaftar. Silakan daftar terlebih dahulu.');
-        return;
-      }
-
-      if (foundUser.password !== password) {
-        setErrorMessage('Password salah! Periksa kembali password Anda.');
-        return;
-      }
-
-      // Login Sukses
-      onUpdateUser({
+    // Cek apakah Super Admin
+    if (
+      email.toLowerCase() === SUPER_ADMIN.email.toLowerCase() &&
+      password === SUPER_ADMIN.password
+    ) {
+      const adminProfile = {
         ...currentUser,
-        role: 'member' as any,
-        name: foundUser.name,
-        email: foundUser.email,
-        phone: foundUser.phone,
-      });
+        role: 'superadmin' as const,
+        name: SUPER_ADMIN.name,
+        email: SUPER_ADMIN.email,
+        phone: SUPER_ADMIN.phone,
+        maxVotes: 1,
+        waSubscribed: true,
+      };
+      await upsertUserToDB(adminProfile);
+      onUpdateUser(adminProfile);
+      setIsLoading(false);
       onClose();
       resetForm();
-    }, 600);
+      return;
+    }
+
+    // Cek ke database localStorage user terdaftar
+    const users = getStoredUsers();
+    const foundUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+
+    if (!foundUser) {
+      setIsLoading(false);
+      setErrorMessage('Email belum terdaftar. Silakan daftar terlebih dahulu.');
+      return;
+    }
+
+    if (foundUser.password !== password) {
+      setIsLoading(false);
+      setErrorMessage('Password salah! Periksa kembali password Anda.');
+      return;
+    }
+
+    const memberProfile = {
+      ...currentUser,
+      role: 'member' as const,
+      name: foundUser.name,
+      email: foundUser.email,
+      phone: foundUser.phone,
+      maxVotes: 1,
+      waSubscribed: true,
+    };
+
+    // Simpan/Sinkronkan ke PostgreSQL Supabase
+    await upsertUserToDB(memberProfile);
+
+    setIsLoading(false);
+    onUpdateUser(memberProfile);
+    onClose();
+    resetForm();
   };
 
   // 2. Handler Pendaftaran (Cek Duplikasi & Kirim OTP Interaktif)
@@ -134,7 +146,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    // Cek apakah email sudah terdaftar di Super Admin atau Database Lokal
     if (email.toLowerCase() === SUPER_ADMIN.email.toLowerCase()) {
       setErrorMessage('Email ini sudah terdaftar sebagai Administrator.');
       return;
@@ -150,7 +161,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     setTimeout(() => {
-      // Generate 4 digit OTP unik untuk email tujuan
       const mockOtp = Math.floor(1000 + Math.random() * 9000).toString();
       setGeneratedOtp(mockOtp);
       setPendingUser({ email, phone, password, name: `Member (${email.split('@')[0]})` });
@@ -159,13 +169,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setViewMode('otp');
       setSuccessMessage(`Kode OTP berhasil dikirim ke email ${email}`);
 
-      // Munculkan Alert interaktif berisi kode OTP asli agar user bisa langsung verifikasi
       alert(`[SIMULASI SERVER EMAIL SNIFF SOCIETY]\n\nKode OTP untuk verifikasi email (${email}) adalah: ${mockOtp}`);
     }, 1000);
   };
 
-  // 3. Handler Verifikasi OTP & Simpan ke DB
-  const handleVerifyRegisterOtp = (e: React.FormEvent) => {
+  // 3. Handler Verifikasi OTP & Simpan ke DB & Supabase
+  const handleVerifyRegisterOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -178,15 +187,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const users = getStoredUsers();
       saveStoredUsers([...users, pendingUser]);
 
-      onUpdateUser({
+      const newMemberProfile = {
         ...currentUser,
-        role: 'member' as any,
+        role: 'member' as const,
         name: pendingUser.name,
         email: pendingUser.email,
         phone: pendingUser.phone,
-      });
+        maxVotes: 1,
+        waSubscribed: true,
+      };
 
-      alert('Akun berhasil diverifikasi dan terdaftar!');
+      // Simpan permanen ke PostgreSQL Supabase
+      await upsertUserToDB(newMemberProfile);
+
+      onUpdateUser(newMemberProfile);
+
+      alert('Akun berhasil diverifikasi dan terdaftar ke database!');
       onClose();
       resetForm();
     }
@@ -238,7 +254,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       ...currentUser,
       role: 'guest',
       name: 'Tamu Penikmat Aroma',
-      email: 'guest@sniffsociety.id',
+      email: 'guest@scentsociety.id',
       phone: '081289201928',
     });
     onClose();
@@ -281,8 +297,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {isLoggedIn ? (
           <div className="space-y-4">
             <div className="p-4 bg-[#121316] border border-[#26282E] rounded-sm space-y-3">
-
-              {/* Tambahan Baris Nama */}
               <div>
                 <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Nama Akun</span>
                 <div className="flex items-center gap-2 text-xs text-[#F3F0EA] font-semibold mt-0.5">
