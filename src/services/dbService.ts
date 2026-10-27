@@ -26,6 +26,21 @@ export async function upsertUserToDB(user: UserProfile & { email: string }): Pro
     return true;
 }
 
+// Mengambil daftar notes dari database berdasarkan tabelnya
+export async function fetchNotesFromDB(table: 'top_notes' | 'middle_notes' | 'base_notes'): Promise<string[]> {
+    const { data, error } = await supabase
+        .from(table)
+        .select('name')
+        .order('name', { ascending: true });
+
+    if (error) {
+        console.error(`Gagal mengambil data ${table}:`, error.message);
+        return [];
+    }
+
+    return (data || []).map((item) => item.name);
+}
+
 // Mengambil seluruh daftar user dari database Supabase
 export async function fetchUsersFromDB(): Promise<UserProfile[]> {
     const { data, error } = await supabase
@@ -125,6 +140,21 @@ export async function insertFragranceToDB(fragrance: Fragrance): Promise<boolean
         console.error('Gagal menyimpan parfum:', error.message);
         return false;
     }
+    return true;
+}
+
+// Menghapus parfum dari database Supabase berdasarkan ID
+export async function deleteFragranceFromDB(id: string): Promise<boolean> {
+    const { error } = await supabase
+        .from('fragrances')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        console.error('Gagal menghapus parfum:', error.message);
+        return false;
+    }
+
     return true;
 }
 

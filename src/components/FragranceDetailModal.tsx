@@ -125,19 +125,19 @@ export const FragranceDetailModal: React.FC<FragranceDetailModalProps> = ({
                 <div className="space-y-2 text-xs">
                   <div className="p-2.5 bg-[#121316] border border-[#23252B] rounded-sm">
                     <span className="text-[11px] font-semibold text-[#E5C390] uppercase tracking-wider block mb-1">
-                      Top Notes (Aroma 15 Menit Pertama)
+                      Top Notes
                     </span>
                     <p className="text-[#C4C4CC]">{fragrance.notes.top.join(' · ')}</p>
                   </div>
                   <div className="p-2.5 bg-[#121316] border border-[#23252B] rounded-sm">
                     <span className="text-[11px] font-semibold text-[#C5A880] uppercase tracking-wider block mb-1">
-                      Heart / Middle Notes (Karakter Utama)
+                      Middle Notes
                     </span>
                     <p className="text-[#C4C4CC]">{fragrance.notes.mid.join(' · ')}</p>
                   </div>
                   <div className="p-2.5 bg-[#121316] border border-[#23252B] rounded-sm">
-                    <span className="text-[11px] font-semibold text-[#8F9098] uppercase tracking-wider block mb-1">
-                      Base Notes (Dry Down & Jejak Wangi)
+                    <span className="text-[11px] font-semibold text-[#C5A880] uppercase tracking-wider block mb-1">
+                      Base Notes
                     </span>
                     <p className="text-[#C4C4CC]">{fragrance.notes.base.join(' · ')}</p>
                   </div>

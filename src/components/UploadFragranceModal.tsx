@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, ShieldCheck, Check, Edit3, Image as ImageIcon } from 'lucide-react';
-import { Fragrance, FragranceCategory, FragranceGender, UserProfile } from '../types';
+import { Fragrance, FragranceGender, UserProfile } from '../types';
+import { fetchNotesFromDB } from '../services/dbService';
 
 interface UploadFragranceModalProps {
     isOpen: boolean;
@@ -21,53 +22,82 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
 
     const [brand, setBrand] = useState('Mykonos');
     const [name, setName] = useState('');
-    const [category, setCategory] = useState<FragranceCategory>('Gourmand');
     const [gender, setGender] = useState<FragranceGender>('Unisex');
     const [concentration, setConcentration] = useState('Eau de Parfum');
     const [batchCode, setBatchCode] = useState('MYK-ID-2026');
     const [perfumer, setPerfumer] = useState('Local Artisan');
     const [releaseYear, setReleaseYear] = useState('2024');
-    const [topNotes, setTopNotes] = useState('Matcha, Bergamot');
-    const [midNotes, setMidNotes] = useState('Jasmine');
-    const [baseNotes, setBaseNotes] = useState('Vanilla, Musk');
+
+    // State untuk daftar pilihan dari database Supabase
+    const [availableTopNotes, setAvailableTopNotes] = useState<string[]>([]);
+    const [availableMiddleNotes, setAvailableMiddleNotes] = useState<string[]>([]);
+    const [availableBaseNotes, setAvailableBaseNotes] = useState<string[]>([]);
+
+    // State untuk notes yang dipilih (array string[])
+    const [selectedTopNotes, setSelectedTopNotes] = useState<string[]>([]);
+    const [selectedMiddleNotes, setSelectedMiddleNotes] = useState<string[]>([]);
+    const [selectedBaseNotes, setSelectedBaseNotes] = useState<string[]>([]);
+
     const [description, setDescription] = useState('');
     const [shopeeUrl, setShopeeUrl] = useState('https://shopee.co.id');
     const [imageUrl, setImageUrl] = useState('');
     const [formSuccess, setFormSuccess] = useState(false);
 
+    // Ambil data pilihan notes dari Supabase saat modal dibuka
+    useEffect(() => {
+        if (isOpen) {
+            async function loadNotes() {
+                const top = await fetchNotesFromDB('top_notes');
+                const middle = await fetchNotesFromDB('middle_notes');
+                const base = await fetchNotesFromDB('base_notes');
+                setAvailableTopNotes(top);
+                setAvailableMiddleNotes(middle);
+                setAvailableBaseNotes(base);
+            }
+            loadNotes();
+        }
+    }, [isOpen]);
+
     useEffect(() => {
         if (editFragrance) {
             setBrand(editFragrance.brand || '');
             setName(editFragrance.name || '');
-            setCategory(editFragrance.category || 'Gourmand');
             setGender(editFragrance.gender || 'Unisex');
             setConcentration(editFragrance.concentration || 'Eau de Parfum');
             setBatchCode(editFragrance.batchCode || 'BATCH-2026');
             setPerfumer(editFragrance.perfumer || 'Local Artisan');
             setReleaseYear(String(editFragrance.releaseYear || 2024));
-            setTopNotes(editFragrance.notes?.top?.join(', ') || '');
-            setMidNotes(editFragrance.notes?.mid?.join(', ') || '');
-            setBaseNotes(editFragrance.notes?.base?.join(', ') || '');
+            setSelectedTopNotes(editFragrance.notes?.top || []);
+            setSelectedMiddleNotes(editFragrance.notes?.mid || []);
+            setSelectedBaseNotes(editFragrance.notes?.base || []);
             setDescription(editFragrance.description || '');
             setShopeeUrl(editFragrance.shopeeUrl || 'https://shopee.co.id');
             setImageUrl(editFragrance.image || '');
         } else {
             setBrand('Mykonos');
             setName('');
-            setCategory('Gourmand');
             setGender('Unisex');
             setConcentration('Eau de Parfum');
             setBatchCode('MYK-ID-2026');
             setPerfumer('Local Artisan');
             setReleaseYear('2024');
-            setTopNotes('Matcha, Bergamot');
-            setMidNotes('Jasmine');
-            setBaseNotes('Vanilla, Musk');
+            setSelectedTopNotes([]);
+            setSelectedMiddleNotes([]);
+            setSelectedBaseNotes([]);
             setDescription('');
             setShopeeUrl('https://shopee.co.id');
             setImageUrl('');
         }
     }, [editFragrance, isOpen]);
+
+    // Handler untuk toggle pilihan notes (menambah atau menghapus dari array)
+    const toggleNote = (note: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
+        if (list.includes(note)) {
+            setList(list.filter((item) => item !== note));
+        } else {
+            setList([...list, note]);
+        }
+    };
 
     // Handler konversi file lokal ke Base64
     const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,14 +129,14 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
             id: editFragrance ? editFragrance.id : `custom-${Date.now()}`,
             brand: brand.trim(),
             name: name.trim(),
-            category,
+            category: editFragrance ? editFragrance.category : 'Gourmand',
             gender,
             concentration,
             image: imageUrl.trim() || editFragrance?.image || 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?auto=format&fit=crop&q=80&w=800',
             notes: {
-                top: topNotes.split(',').map((s) => s.trim()).filter(Boolean),
-                mid: midNotes.split(',').map((s) => s.trim()).filter(Boolean),
-                base: baseNotes.split(',').map((s) => s.trim()).filter(Boolean),
+                top: selectedTopNotes,
+                mid: selectedMiddleNotes,
+                base: selectedBaseNotes,
             },
             perfumer,
             releaseYear: parseInt(releaseYear, 10) || 2024,
@@ -194,23 +224,7 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-xs text-[#A1A1AA]">Kategori Olfaktori</label>
-                                <select
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value as FragranceCategory)}
-                                    className="w-full py-2 px-3 bg-[#121316] border border-[#2E3138] text-xs text-[#F3F0EA] rounded-sm outline-none focus:border-[#C5A880]"
-                                >
-                                    <option value="Woody">Woody</option>
-                                    <option value="Oriental">Oriental</option>
-                                    <option value="Fresh">Fresh</option>
-                                    <option value="Floral">Floral</option>
-                                    <option value="Gourmand">Gourmand</option>
-                                    <option value="Leather">Leather</option>
-                                </select>
-                            </div>
-
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs text-[#A1A1AA]">Gender</label>
                                 <select
@@ -226,12 +240,17 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
 
                             <div className="space-y-1">
                                 <label className="text-xs text-[#A1A1AA]">Konsentrasi</label>
-                                <input
-                                    type="text"
+                                <select
                                     value={concentration}
                                     onChange={(e) => setConcentration(e.target.value)}
                                     className="w-full py-2 px-3 bg-[#121316] border border-[#2E3138] text-xs text-[#F3F0EA] rounded-sm outline-none focus:border-[#C5A880]"
-                                />
+                                >
+                                    <option value="Extrait de Parfum">Extrait de Parfum</option>
+                                    <option value="Eau de Parfum">Eau de Parfum</option>
+                                    <option value="Eau de Toilette">Eau de Toilette</option>
+                                    <option value="Eau de Cologne">Eau de Cologne</option>
+                                    <option value="Eau Fraiche">Eau Fraiche</option>
+                                </select>
                             </div>
                         </div>
 
@@ -257,35 +276,75 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
                             )}
                         </div>
 
+                        {/* Dropdown / Tag Multi-Select Notes dari Database */}
                         <div className="space-y-3 pt-2">
+                            {/* Top Notes */}
                             <div className="space-y-1">
-                                <label className="text-xs text-[#A1A1AA]">Top Notes (Dipisah Koma)</label>
-                                <input
-                                    type="text"
-                                    value={topNotes}
-                                    onChange={(e) => setTopNotes(e.target.value)}
-                                    className="w-full py-2 px-3 bg-[#121316] border border-[#2E3138] text-xs text-[#F3F0EA] rounded-sm outline-none focus:border-[#C5A880]"
-                                />
+                                <label className="text-xs text-[#A1A1AA]">Top Notes (Pilih beberapa)</label>
+                                <div className="flex flex-wrap gap-1.5 p-2.5 bg-[#121316] border border-[#2E3138] rounded-sm max-h-36 overflow-y-auto">
+                                    {availableTopNotes.map((note) => {
+                                        const isSelected = selectedTopNotes.includes(note);
+                                        return (
+                                            <button
+                                                type="button"
+                                                key={note}
+                                                onClick={() => toggleNote(note, selectedTopNotes, setSelectedTopNotes)}
+                                                className={`px-2.5 py-1 text-xs rounded-sm transition-colors cursor-pointer ${isSelected
+                                                        ? 'bg-[#C5A880] text-[#121316] font-semibold'
+                                                        : 'bg-[#1A1C21] text-[#F3F0EA] border border-[#2E3138] hover:border-[#C5A880]'
+                                                    }`}
+                                            >
+                                                {isSelected ? `✓ ${note}` : `+ ${note}`}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
+                            {/* Middle Notes */}
                             <div className="space-y-1">
-                                <label className="text-xs text-[#A1A1AA]">Heart / Middle Notes (Dipisah Koma)</label>
-                                <input
-                                    type="text"
-                                    value={midNotes}
-                                    onChange={(e) => setMidNotes(e.target.value)}
-                                    className="w-full py-2 px-3 bg-[#121316] border border-[#2E3138] text-xs text-[#F3F0EA] rounded-sm outline-none focus:border-[#C5A880]"
-                                />
+                                <label className="text-xs text-[#A1A1AA]">Middle Notes (Pilih beberapa)</label>
+                                <div className="flex flex-wrap gap-1.5 p-2.5 bg-[#121316] border border-[#2E3138] rounded-sm max-h-36 overflow-y-auto">
+                                    {availableMiddleNotes.map((note) => {
+                                        const isSelected = selectedMiddleNotes.includes(note);
+                                        return (
+                                            <button
+                                                type="button"
+                                                key={note}
+                                                onClick={() => toggleNote(note, selectedMiddleNotes, setSelectedMiddleNotes)}
+                                                className={`px-2.5 py-1 text-xs rounded-sm transition-colors cursor-pointer ${isSelected
+                                                        ? 'bg-[#C5A880] text-[#121316] font-semibold'
+                                                        : 'bg-[#1A1C21] text-[#F3F0EA] border border-[#2E3138] hover:border-[#C5A880]'
+                                                    }`}
+                                            >
+                                                {isSelected ? `✓ ${note}` : `+ ${note}`}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
+                            {/* Base Notes */}
                             <div className="space-y-1">
-                                <label className="text-xs text-[#A1A1AA]">Base Notes (Dipisah Koma)</label>
-                                <input
-                                    type="text"
-                                    value={baseNotes}
-                                    onChange={(e) => setBaseNotes(e.target.value)}
-                                    className="w-full py-2 px-3 bg-[#121316] border border-[#2E3138] text-xs text-[#F3F0EA] rounded-sm outline-none focus:border-[#C5A880]"
-                                />
+                                <label className="text-xs text-[#A1A1AA]">Base Notes (Pilih beberapa)</label>
+                                <div className="flex flex-wrap gap-1.5 p-2.5 bg-[#121316] border border-[#2E3138] rounded-sm max-h-36 overflow-y-auto">
+                                    {availableBaseNotes.map((note) => {
+                                        const isSelected = selectedBaseNotes.includes(note);
+                                        return (
+                                            <button
+                                                type="button"
+                                                key={note}
+                                                onClick={() => toggleNote(note, selectedBaseNotes, setSelectedBaseNotes)}
+                                                className={`px-2.5 py-1 text-xs rounded-sm transition-colors cursor-pointer ${isSelected
+                                                        ? 'bg-[#C5A880] text-[#121316] font-semibold'
+                                                        : 'bg-[#1A1C21] text-[#F3F0EA] border border-[#2E3138] hover:border-[#C5A880]'
+                                                    }`}
+                                            >
+                                                {isSelected ? `✓ ${note}` : `+ ${note}`}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
 
