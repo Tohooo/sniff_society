@@ -175,8 +175,8 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
                   }
                 }}
                 className={`w-full p-3 rounded-sm border text-center transition-all ${isSlotUsed
-                    ? 'bg-[#2A2318] border-[#C5A880] text-[#E5C390] cursor-pointer hover:bg-[#382f20] hover:border-amber-400 group relative'
-                    : 'bg-[#121316] border-[#2A2D35] text-[#52525B]'
+                  ? 'bg-[#2A2318] border-[#C5A880] text-[#E5C390] cursor-pointer hover:bg-[#382f20] hover:border-amber-400 group relative'
+                  : 'bg-[#121316] border-[#2A2D35] text-[#52525B]'
                   }`}
               >
                 <div className="text-[10px] uppercase font-mono text-[#A1A1AA]">
@@ -428,7 +428,7 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
           </div>
         ) : (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
               {paginatedList.map((item) => {
                 const hasVoted = votedIds.includes(item.id);
                 const voteShare = calculateVoteShare(item.votes, totalVotesAcrossAll);
@@ -437,8 +437,8 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
                   <div
                     key={item.id}
                     className={`flex flex-col bg-[#17191E] border rounded-sm transition-all duration-300 relative overflow-hidden group ${hasVoted
-                        ? 'border-[#C5A880] ring-1 ring-[#C5A880]/30 shadow-lg shadow-[#C5A880]/5'
-                        : 'border-[#26282E] hover:border-[#383C45]'
+                      ? 'border-[#C5A880] ring-1 ring-[#C5A880]/30 shadow-lg shadow-[#C5A880]/5'
+                      : 'border-[#26282E] hover:border-[#383C45]'
                       }`}
                   >
                     <div className="relative aspect-[4/3] w-full bg-[#121316] overflow-hidden">
@@ -566,10 +566,10 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
                         <button
                           onClick={() => onToggleVote(item.id)}
                           className={`w-full py-2.5 px-4 text-xs font-semibold uppercase tracking-[0.14em] rounded-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${hasVoted
-                              ? 'bg-[#2A2318] text-[#E5C390] border border-[#C5A880] hover:bg-[#342b1e]'
-                              : remainingVotes > 0
-                                ? 'bg-[#1A1C21] hover:bg-[#C5A880] text-[#F3F0EA] hover:text-[#121316] border border-[#2E3138]'
-                                : 'bg-[#141518] text-[#52525B] border border-[#202227] hover:border-[#383C45]'
+                            ? 'bg-[#2A2318] text-[#E5C390] border border-[#C5A880] hover:bg-[#342b1e]'
+                            : remainingVotes > 0
+                              ? 'bg-[#1A1C21] hover:bg-[#C5A880] text-[#F3F0EA] hover:text-[#121316] border border-[#2E3138]'
+                              : 'bg-[#141518] text-[#52525B] border border-[#202227] hover:border-[#383C45]'
                             }`}
                         >
                           {hasVoted ? (
@@ -601,8 +601,8 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
                   onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
                   className={`px-3.5 py-2 text-xs rounded-sm border flex items-center gap-1 transition-colors ${currentPage === 1
-                      ? 'bg-[#141518] border-[#202227] text-[#52525B] cursor-not-allowed'
-                      : 'bg-[#17191E] border-[#2E3138] text-[#F3F0EA] hover:border-[#C5A880] cursor-pointer'
+                    ? 'bg-[#141518] border-[#202227] text-[#52525B] cursor-not-allowed'
+                    : 'bg-[#17191E] border-[#2E3138] text-[#F3F0EA] hover:border-[#C5A880] cursor-pointer'
                     }`}
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -616,8 +616,8 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
                       key={page}
                       onClick={() => setCurrentPage(page)}
                       className={`w-8 h-8 rounded-sm border text-xs font-semibold transition-colors cursor-pointer ${currentPage === page
-                          ? 'bg-[#C5A880] text-[#121316] border-[#C5A880]'
-                          : 'bg-[#17191E] text-[#A1A1AA] border-[#2E3138] hover:border-[#C5A880]'
+                        ? 'bg-[#C5A880] text-[#121316] border-[#C5A880]'
+                        : 'bg-[#17191E] text-[#A1A1AA] border-[#2E3138] hover:border-[#C5A880]'
                         }`}
                     >
                       {page}
@@ -630,8 +630,8 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
                   onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
                   className={`px-3.5 py-2 text-xs rounded-sm border flex items-center gap-1 transition-colors ${currentPage === totalPages
-                      ? 'bg-[#141518] border-[#202227] text-[#52525B] cursor-not-allowed'
-                      : 'bg-[#17191E] border-[#2E3138] text-[#F3F0EA] hover:border-[#C5A880] cursor-pointer'
+                    ? 'bg-[#141518] border-[#202227] text-[#52525B] cursor-not-allowed'
+                    : 'bg-[#17191E] border-[#2E3138] text-[#F3F0EA] hover:border-[#C5A880] cursor-pointer'
                     }`}
                 >
                   <span>Berikutnya</span>
