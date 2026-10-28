@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, ShieldCheck, Check, Edit3, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, ShieldCheck, Check, Edit3, Image as ImageIcon, Search } from 'lucide-react';
 import { Fragrance, FragranceGender, UserProfile } from '../types';
 import { fetchNotesFromDB } from '../services/dbService';
+import { supabase } from '../services/supabaseClient';
 
 interface UploadFragranceModalProps {
     isOpen: boolean;
@@ -10,6 +11,146 @@ interface UploadFragranceModalProps {
     currentUser: UserProfile;
     editFragrance?: Fragrance | null;
 }
+
+// Komponen NotesSelector dengan Fitur Tambah Note Baru ke Database
+interface NotesSelectorProps {
+    label: string;
+    allNotes: string[];
+    selectedNotes: string[];
+    onChange: (notes: string[]) => void;
+}
+
+const NotesSelector: React.FC<NotesSelectorProps> = ({ label, allNotes, selectedNotes, onChange }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+    const [isAdding, setIsAdding] = useState(false);
+
+    // Filter notes berdasarkan ketikan user
+    const filteredNotes = searchTerm.trim().length > 0
+        ? allNotes.filter(
+            (note) =>
+                note.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                !selectedNotes.includes(note)
+        ).slice(0, 30)
+        : [];
+
+    // Cek apakah note yang diketik sudah ada persis di database atau belum
+    const exactMatchExists = allNotes.some(
+        (note) => note.toLowerCase() === searchTerm.trim().toLowerCase()
+    );
+
+    const handleAdd = (note: string) => {
+        onChange([...selectedNotes, note]);
+        setSearchTerm('');
+        setIsOpen(false);
+    };
+
+    const handleRemove = (noteToRemove: string) => {
+        onChange(selectedNotes.filter((n) => n !== noteToRemove));
+    };
+
+    // Fungsi untuk memasukkan note baru langsung ke database Supabase
+    const handleAddNewNoteToDB = async () => {
+        const newNoteName = searchTerm.trim();
+        if (!newNoteName) return;
+
+        setIsAdding(true);
+        try {
+            // Masukkan ke tabel 'notes' di Supabase
+            const { error } = await supabase.from('notes').insert([{ name: newNoteName }]);
+
+            if (error) {
+                console.error('Gagal menambah note baru:', error.message);
+                alert('Gagal menambahkan note ke database.');
+            } else {
+                // Tambahkan langsung ke selectedNotes dan perbarui master list lokal jika perlu
+                handleAdd(newNoteName);
+                alert(`Berhasil menambahkan note baru "${newNoteName}" ke database!`);
+            }
+        } catch (err) {
+            console.error('Error adding note:', err);
+        } finally {
+            setIsAdding(false);
+        }
+    };
+
+    return (
+        <div className="space-y-1.5 relative">
+            <label className="text-xs text-[#A1A1AA] font-medium">{label} (Pilih beberapa)</label>
+
+            {/* Input Kotak Pencarian */}
+            <div className="relative">
+                <Search className="w-3.5 h-3.5 text-[#71717A] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setIsOpen(true);
+                    }}
+                    onFocus={() => setIsOpen(true)}
+                    placeholder={`Ketik untuk cari atau tambah ${label.toLowerCase()}...`}
+                    className="w-full pl-9 pr-8 py-2 bg-[#121316] border border-[#2E3138] focus:border-[#C5A880] text-xs text-[#F3F0EA] placeholder-[#52525B] rounded-sm outline-none transition-colors"
+                />
+            </div>
+
+            {/* Dropdown Hasil Pencarian & Opsi Tambah Baru */}
+            {isOpen && searchTerm.trim().length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-[#17191E] border border-[#C5A880] rounded-sm shadow-2xl max-h-52 overflow-y-auto space-y-0.5 p-1">
+                    {/* Tombol Tambah Note Baru jika belum ada di DB */}
+                    {!exactMatchExists && (
+                        <div
+                            onClick={handleAddNewNoteToDB}
+                            className="px-3 py-2.5 text-xs bg-[#2A2318] text-[#E5C390] hover:bg-[#382f20] border-b border-[#383C45] rounded-sm cursor-pointer transition-colors flex items-center justify-between font-semibold"
+                        >
+                            <span>+ Tambah "{searchTerm.trim()}" ke Database</span>
+                            <span className="text-[10px] text-[#C5A880] uppercase tracking-wider">{isAdding ? 'Menyimpan...' : 'Baru'}</span>
+                        </div>
+                    )}
+
+                    {filteredNotes.length > 0 ? (
+                        filteredNotes.map((note) => (
+                            <div
+                                key={note}
+                                onClick={() => handleAdd(note)}
+                                className="px-3 py-2 text-xs text-[#F3F0EA] hover:bg-[#C5A880] hover:text-[#121316] rounded-sm cursor-pointer transition-colors flex items-center justify-between"
+                            >
+                                <span>+ {note}</span>
+                            </div>
+                        ))
+                    ) : exactMatchExists ? (
+                        <div className="px-3 py-2 text-xs text-[#71717A] text-center italic">
+                            Note sudah dipilih atau ada di daftar
+                        </div>
+                    ) : null}
+                </div>
+            )}
+
+            {/* Kotak Badge Notes yang Sudah Dipilih */}
+            <div className="flex flex-wrap gap-1.5 p-2.5 bg-[#121316] border border-[#2E3138] rounded-sm min-h-[44px] items-center">
+                {selectedNotes.length === 0 ? (
+                    <span className="text-[11px] text-[#52525B] italic">Belum ada {label.toLowerCase()} yang dipilih</span>
+                ) : (
+                    selectedNotes.map((note) => (
+                        <span
+                            key={note}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-sm bg-[#C5A880] text-[#121316] font-semibold"
+                        >
+                            {note}
+                            <button
+                                type="button"
+                                onClick={() => handleRemove(note)}
+                                className="hover:text-red-900 cursor-pointer"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </span>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
 
 export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
     isOpen,
@@ -28,10 +169,8 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
     const [perfumer, setPerfumer] = useState('Local Artisan');
     const [releaseYear, setReleaseYear] = useState('2024');
 
-    // State untuk daftar pilihan dari database Supabase
-    const [availableTopNotes, setAvailableTopNotes] = useState<string[]>([]);
-    const [availableMiddleNotes, setAvailableMiddleNotes] = useState<string[]>([]);
-    const [availableBaseNotes, setAvailableBaseNotes] = useState<string[]>([]);
+    // Master list semua notes dari tabel tunggal Supabase
+    const [masterNotes, setMasterNotes] = useState<string[]>([]);
 
     // State untuk notes yang dipilih (array string[])
     const [selectedTopNotes, setSelectedTopNotes] = useState<string[]>([]);
@@ -43,18 +182,14 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
     const [imageUrl, setImageUrl] = useState('');
     const [formSuccess, setFormSuccess] = useState(false);
 
-    // Ambil data pilihan notes dari Supabase saat modal dibuka
+    // Ambil data master notes dari Supabase saat modal dibuka
     useEffect(() => {
         if (isOpen) {
-            async function loadNotes() {
-                const top = await fetchNotesFromDB('top_notes');
-                const middle = await fetchNotesFromDB('middle_notes');
-                const base = await fetchNotesFromDB('base_notes');
-                setAvailableTopNotes(top);
-                setAvailableMiddleNotes(middle);
-                setAvailableBaseNotes(base);
+            async function loadMasterNotes() {
+                const notesList = await fetchNotesFromDB();
+                setMasterNotes(notesList);
             }
-            loadNotes();
+            loadMasterNotes();
         }
     }, [isOpen]);
 
@@ -89,15 +224,6 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
             setImageUrl('');
         }
     }, [editFragrance, isOpen]);
-
-    // Handler untuk toggle pilihan notes (menambah atau menghapus dari array)
-    const toggleNote = (note: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
-        if (list.includes(note)) {
-            setList(list.filter((item) => item !== note));
-        } else {
-            setList([...list, note]);
-        }
-    };
 
     // Handler konversi file lokal ke Base64
     const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -276,76 +402,28 @@ export const UploadFragranceModal: React.FC<UploadFragranceModalProps> = ({
                             )}
                         </div>
 
-                        {/* Dropdown / Tag Multi-Select Notes dari Database */}
+                        {/* Searchable Multi-Select Notes Component */}
                         <div className="space-y-3 pt-2">
-                            {/* Top Notes */}
-                            <div className="space-y-1">
-                                <label className="text-xs text-[#A1A1AA]">Top Notes (Pilih beberapa)</label>
-                                <div className="flex flex-wrap gap-1.5 p-2.5 bg-[#121316] border border-[#2E3138] rounded-sm max-h-36 overflow-y-auto">
-                                    {availableTopNotes.map((note) => {
-                                        const isSelected = selectedTopNotes.includes(note);
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={note}
-                                                onClick={() => toggleNote(note, selectedTopNotes, setSelectedTopNotes)}
-                                                className={`px-2.5 py-1 text-xs rounded-sm transition-colors cursor-pointer ${isSelected
-                                                        ? 'bg-[#C5A880] text-[#121316] font-semibold'
-                                                        : 'bg-[#1A1C21] text-[#F3F0EA] border border-[#2E3138] hover:border-[#C5A880]'
-                                                    }`}
-                                            >
-                                                {isSelected ? `✓ ${note}` : `+ ${note}`}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            <NotesSelector
+                                label="Top Notes"
+                                allNotes={masterNotes}
+                                selectedNotes={selectedTopNotes}
+                                onChange={setSelectedTopNotes}
+                            />
 
-                            {/* Middle Notes */}
-                            <div className="space-y-1">
-                                <label className="text-xs text-[#A1A1AA]">Middle Notes (Pilih beberapa)</label>
-                                <div className="flex flex-wrap gap-1.5 p-2.5 bg-[#121316] border border-[#2E3138] rounded-sm max-h-36 overflow-y-auto">
-                                    {availableMiddleNotes.map((note) => {
-                                        const isSelected = selectedMiddleNotes.includes(note);
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={note}
-                                                onClick={() => toggleNote(note, selectedMiddleNotes, setSelectedMiddleNotes)}
-                                                className={`px-2.5 py-1 text-xs rounded-sm transition-colors cursor-pointer ${isSelected
-                                                        ? 'bg-[#C5A880] text-[#121316] font-semibold'
-                                                        : 'bg-[#1A1C21] text-[#F3F0EA] border border-[#2E3138] hover:border-[#C5A880]'
-                                                    }`}
-                                            >
-                                                {isSelected ? `✓ ${note}` : `+ ${note}`}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            <NotesSelector
+                                label="Middle Notes"
+                                allNotes={masterNotes}
+                                selectedNotes={selectedMiddleNotes}
+                                onChange={setSelectedMiddleNotes}
+                            />
 
-                            {/* Base Notes */}
-                            <div className="space-y-1">
-                                <label className="text-xs text-[#A1A1AA]">Base Notes (Pilih beberapa)</label>
-                                <div className="flex flex-wrap gap-1.5 p-2.5 bg-[#121316] border border-[#2E3138] rounded-sm max-h-36 overflow-y-auto">
-                                    {availableBaseNotes.map((note) => {
-                                        const isSelected = selectedBaseNotes.includes(note);
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={note}
-                                                onClick={() => toggleNote(note, selectedBaseNotes, setSelectedBaseNotes)}
-                                                className={`px-2.5 py-1 text-xs rounded-sm transition-colors cursor-pointer ${isSelected
-                                                        ? 'bg-[#C5A880] text-[#121316] font-semibold'
-                                                        : 'bg-[#1A1C21] text-[#F3F0EA] border border-[#2E3138] hover:border-[#C5A880]'
-                                                    }`}
-                                            >
-                                                {isSelected ? `✓ ${note}` : `+ ${note}`}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            <NotesSelector
+                                label="Base Notes"
+                                allNotes={masterNotes}
+                                selectedNotes={selectedBaseNotes}
+                                onChange={setSelectedBaseNotes}
+                            />
                         </div>
 
                         <div className="space-y-1 pt-2">

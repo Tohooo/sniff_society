@@ -26,15 +26,15 @@ export async function upsertUserToDB(user: UserProfile & { email: string }): Pro
     return true;
 }
 
-// Mengambil daftar notes dari database berdasarkan tabelnya
-export async function fetchNotesFromDB(table: 'top_notes' | 'middle_notes' | 'base_notes'): Promise<string[]> {
+// Mengambil seluruh daftar notes dari tabel master tunggal 'notes' di Supabase
+export async function fetchNotesFromDB(): Promise<string[]> {
     const { data, error } = await supabase
-        .from(table)
+        .from('notes')
         .select('name')
         .order('name', { ascending: true });
 
     if (error) {
-        console.error(`Gagal mengambil data ${table}:`, error.message);
+        console.error('Gagal mengambil data notes:', error.message);
         return [];
     }
 

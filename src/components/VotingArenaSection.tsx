@@ -53,12 +53,10 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
   // Ambil data notes dari Supabase saat komponen dimuat
   useEffect(() => {
     async function loadFilterNotes() {
-      const top = await fetchNotesFromDB('top_notes');
-      const middle = await fetchNotesFromDB('middle_notes');
-      const base = await fetchNotesFromDB('base_notes');
-      setAvailableTopNotes(top);
-      setAvailableMiddleNotes(middle);
-      setAvailableBaseNotes(base);
+      const allNotes = await fetchNotesFromDB();
+      setAvailableTopNotes(allNotes);
+      setAvailableMiddleNotes(allNotes);
+      setAvailableBaseNotes(allNotes);
     }
     loadFilterNotes();
   }, []);
