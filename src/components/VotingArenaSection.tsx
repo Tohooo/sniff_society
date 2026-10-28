@@ -428,7 +428,7 @@ export const VotingArenaSection: React.FC<VotingArenaSectionProps> = ({
           </div>
         ) : (
           <div className="space-y-8">
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               {paginatedList.map((item) => {
                 const hasVoted = votedIds.includes(item.id);
                 const voteShare = calculateVoteShare(item.votes, totalVotesAcrossAll);
